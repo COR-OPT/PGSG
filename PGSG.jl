@@ -3,7 +3,7 @@ Implementation of PGSG
 """
 module PGSG
 
-export pgsg
+export pgsg, pf_pgsg
 
 
 
@@ -44,10 +44,10 @@ function pgsg(x0, grad_oracle, proj, gamma, rho, T)
 end
 
 "Run Parameter Free PGSG"
-function pf_pgsg(x0, grad_oracle, proj, T, beta)
+function pf_pgsg(x0, grad_oracle, proj, beta, T)
     x = x0
     for t in 0:T-2
-        gamma = pow(t+1, beta)
+        gamma = (t+1)^(beta)
         rho = 1/(2*gamma)
         x = stochasticGradient(x, grad_oracle, proj, gamma, rho, t, innerIterations(t, gamma, rho))
     end
