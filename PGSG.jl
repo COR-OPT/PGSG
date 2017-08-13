@@ -11,7 +11,7 @@ export pgsg, pf_pgsg, RPCA_PGSG, RPCA_PF_PGSG
 function innerIterations(t, gamma, rho)
     a = (4/(1-gamma*rho) +1)*(36/(1-gamma*rho))
     if 2*a*log(2*a) > 0
-        return t + max(1, ceil(2*a*log(2*a)))
+        return t + 1 #+ max(1, ceil(2*a*log(2*a)))
     else
         return t + 1
     end
@@ -30,7 +30,7 @@ function stochasticGradient(y0, grad_oracle, proj, gamma, rho, t, numIterations)
         y = proj(y - stepsize(t,j,gamma,rho)*(grad_oracle(y) + (y-y0)/gamma))
         w = ((j+1)*w + y)/(j+2)
     end
-    println("Inner loop finished")
+    println("Inner loop finished ", norm(y0-w)/gamma)
     return w
 end
 
@@ -43,6 +43,7 @@ function pgsg(x0, grad_oracle, proj, gamma, rho, T)
     end
     return x
 end
+
 
 "Run Parameter Free PGSG"
 function pf_pgsg(x0, grad_oracle, proj, beta, T)
@@ -59,10 +60,57 @@ end
 
 
 
+
+"WITH OBJECTIVE TRACKING - Run projected stochastic subgradient method on a strongly convex problem"
+function stochasticGradient(y0, grad_oracle, proj, gamma, rho, t, numIterations, inner_obj, objective, currentIterate)
+    w = y0
+    y = y0
+    
+    for j in 0:numIterations-2
+        y = proj(y - stepsize(t,j,gamma,rho)*(grad_oracle(y) + (y-y0)/gamma))
+        w = ((j+1)*w + y)/(j+2)
+        inner_obj[currentIterate] = objective(y)
+        currentIterate = currentIterate +1
+    end
+    println("Inner loop finished ", norm(y0-w)/gamma)
+    return w, currentIterate
+end
+"WITH OBJECTIVE TRACKING - Run Parameter Free PGSG"
+function pf_pgsg(x0, grad_oracle, proj, beta, T, objective)
+    obj = zeros(T-1)
+    grad_size = zeros(T-1)
+    inner_obj = zeros(convert(Int64, (T-1)*(T-2)/2))
+    x = x0
+    currentIterate = 1
+    for t in 0:T-2
+        gamma = (t+1)^(beta)/10
+        rho = 1/(2*gamma)
+        w,currentIterate = stochasticGradient(x, grad_oracle, proj, gamma, rho, t, innerIterations(t, gamma, rho), inner_obj, objective, currentIterate)
+        grad_size[t+1] = norm(w-x)/gamma
+        x = w
+        obj[t+1] = objective(x)
+    end
+    return x, obj, inner_obj, grad_size
+end
+
+
+
+
+
 function identity(x)
     return x
 end
 
+function oneNorm(A)
+    r=0
+    n,m = size(A)
+    for i in 1:m
+        for j in 1:m
+            r = r + abs(A[i,j])
+        end
+    end
+    return r
+end
 "Application to solving Robust PCA"
 function RPCA_PGSG(U,V,A, gamma, rho, T)
     
@@ -238,7 +286,10 @@ function RPCA_PF_PGSG(U,V,A, beta, T)
         return [∇U, ∇V] 
     end
 
-    return pf_pgsg([U,V], stochastic_subgradient2, identity, beta, T)
+    function objective_RPCA(X)
+        return oneNorm(X[1].'*X[2] - A)
+    end
+    return pf_pgsg([U,V], stochastic_subgradient2, identity, beta, T, objective_RPCA)
 end
 
 
