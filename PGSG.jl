@@ -106,16 +106,7 @@ function identity(x)
     return x
 end
 
-function oneNorm(A)
-    r=0
-    n,m = size(A)
-    for i in 1:m
-        for j in 1:m
-            r = r + abs(A[i,j])
-        end
-    end
-    return r
-end
+
 "Application to solving Robust PCA"
 function RPCA_PGSG(U,V,A, gamma, rho, T, scale=1)
 
@@ -147,7 +138,7 @@ function RPCA_PGSG(U,V,A, gamma, rho, T, scale=1)
     end
 
     function objective_RPCA(X)
-        return oneNorm(X[1].'*X[2] - A)
+        return vecnorm(X[1].'*X[2] - A, 1)
     end
     return pgsg([U,V], stochastic_subgradient1, identity, gamma, rho, T, objective_RPCA)
 end
@@ -183,7 +174,7 @@ function RPCA_PF_PGSG(U,V,A, beta, T, scale=1)
     end
 
     function objective_RPCA(X)
-        return oneNorm(X[1].'*X[2] - A)
+        return vecnorm(X[1].'*X[2] - A, 1)
     end
     return pf_pgsg([U,V], stochastic_subgradient1, identity, beta, T, objective_RPCA)
 end
@@ -222,8 +213,8 @@ function RPCA_subgradient(U,V,A,T, scale=1)
     X = [U,V]
     for j in 1:T
         X = X - (alpha/sqrt(j))*stochastic_subgradient1(X)
-        obj[j] = oneNorm(X[1].'*X[2] - A)
-        if j%50==0 println("Inner loop finished ", oneNorm(X[1].'*X[2] - A)) end
+        obj[j] = vecnorm(X[1].'*X[2] - A, 1)
+        if j%50==0 println("Inner loop finished ", vecnorm(X[1].'*X[2] - A, 1)) end
     end
     return X, obj
 end
